@@ -7,7 +7,9 @@ import plotly.graph_objects as go
 
 if __name__ == '__main__':
     """ Read raw csv """
-    data = pd.read_csv("dataset.csv", usecols=['Hour', 'Top-Level Project', 'Duration'],
+    dataset = "dataset2.csv"
+    long = True
+    data = pd.read_csv(dataset, usecols=['Hour', 'Top-Level Project', 'Duration'],
                        parse_dates=['Hour'])
     data.Duration = pd.to_timedelta(data.Duration)
 
@@ -17,6 +19,11 @@ if __name__ == '__main__':
     # print(processed_columns)
     processed_data = pd.DataFrame(data=0, columns=processed_columns, index=data['Hour'].unique())
     # print(processed_data)
+    filtered_cols = ['Modern Political Thought', 'Visualization', 'Food',
+                     'General Non-Productive', 'Listening to Music', 'Photography', 'Social',
+                     'Watching Movies', 'Cleaning', 'Nintendo Switch', 'OS', 'Netflix',
+                     'Computational Models etc', 'Guitar', 'Script Development', 'Daydreaming',
+                     'Computer Vision', 'Long']
 
     """ load aggregated durations"""
     for index, row in data.iterrows():
@@ -24,11 +31,19 @@ if __name__ == '__main__':
         duration = row['Duration']
         hour = row['Hour']
 
+        if project not in filtered_cols:
+            continue
+
         if duration > pd.Timedelta('1 hour'):
-            processed_data.at[hour, 'Long'] += int(duration.components.hours)
-            processed_data.at[hour, project] += 60
-            # print(pd.DatetimeIndex(duration).minute)
-            # continue
+            if long:
+                processed_data.at[hour, 'Long'] += int(duration.components.hours)
+                processed_data.at[hour, project] += 60
+                # print(pd.DatetimeIndex(duration).minute)
+                # continue
+            else:
+                continue
+        elif duration < pd.Timedelta('5 minutes'):
+            continue
         else:
             processed_data.at[hour, project] += int(duration.components.minutes)
 
@@ -60,18 +75,27 @@ if __name__ == '__main__':
     pca = PCA(n_components=2)
     components = pca.fit_transform(processed_data)
     # print(components)
+    #
+    # """ plot with datalabels describing each row"""
+    # fig = px.scatter(components, x=0, y=1, hover_name=data['Hour'].unique(),
+    #                  template=plotly.io.templates["simple_white"], labels={'0': "what", '1': "hmmm"},
+    #                  color=pd.DatetimeIndex(data['Hour'].unique()).hour, color_continuous_scale=px.colors.cyclical.HSV,
+    #                  size=(processed_data['Long'] + 1))
 
-    """ plot with datalabels describing each row"""
-    fig = px.scatter(components, x=0, y=1, hover_name=data['Hour'].unique(),
-                     template=plotly.io.templates["simple_white"], labels={'0': "what", '1': "hmmm"},
-                     color=pd.DatetimeIndex(data['Hour'].unique()).hour, color_continuous_scale=px.colors.cyclical.HSV,
-                     size=(processed_data['Long'] + 1))
 
     figfig = go.Figure(data=go.Scatter(x=components[:, 0], y=components[:, 1], mode='markers',
                             text=pd.DatetimeIndex(data['Hour'].unique()),
-                            marker={'color': pd.DatetimeIndex(data['Hour'].unique()).hour.astype(int),
+                            marker={'colorbar': {'title': {'text': 'Time', 'font': {'size': 18}}, 'xpad': 15, },
+                                    'color': pd.DatetimeIndex(data['Hour'].unique()).hour.astype(int),
                                     'size': ((processed_data['Long'] + 3) * 4),
-                                    'colorscale': plotly.colors.cyclical.Twilight}))
+                                    'colorscale': plotly.colors.cyclical.Twilight}),
+                       layout={'font': {'family': 'Courier New, monospace', 'size': 14,
+                                        'color': plotly.colors.qualitative.Pastel1[8]},
+                               'title': {'text': 'Activity analysis, 3.6 - 21.6', 'x': 0.5, 'xanchor': 'center',
+                                         'y': 0.94, 'yanchor': 'top',
+                                         'font': {'family': 'Overpass', 'size': 36}},
+                               'plot_bgcolor': 'white',
+                               'paper_bgcolor': plotly.colors.qualitative.Set2[7]})
 
     """ create text labels """
     # join columns with each row, remove long row
@@ -95,5 +119,8 @@ if __name__ == '__main__':
     figfig.update_traces(hoverinfo='text',
                          hovertext=(pd.DatetimeIndex(data['Hour'].unique()).astype(str) + text_array).tolist(),
                          selector=dict(type='scatter'))
+
+    figfig.update_xaxes({'visible': False})
+    figfig.update_yaxes({'visible': False})
 
     figfig.show()
